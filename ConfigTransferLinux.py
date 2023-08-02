@@ -6,6 +6,7 @@ import shutil
 import os.path
 import sys
 
+# Задание переменных - тип системы, список служб, первые символы однострочных комментариев, версии:
 system = 'linux' #'linux', 'win'
 services = ['WebApi', 'RobotLogs', 'Notifications', 'MachineInfo', 'RDP2', 'States'] #'WebApi', 'RobotLogs', 'Notifications', 'States', 'MachineInfo', 'RDP2'
 commentStarts = ['// ', '//"', '//en', '//ru', '//Post', '//MS', '//mzL', '//}', '//Win', '//Адреса', '//,', '//For']
@@ -15,10 +16,12 @@ versions = ['2.2.26.0', '1.23.1.1', '1.23.2.0', '1.23.4.0', '1.23.5.0', '1.23.6.
 
 flagRDP = False
 
+# Блок перенаправления консоли в файл:
 if system == 'linux':
     textEncoding = ''
 sys.stdout = open('Log.txt', 'w')
 
+# Функция подготовки файлов конфигов (очистка от комментариев, замена одинарных слешей):
 def prepareFiles(text):
     for et in exceptedText1:
         text = text.replace(et, '')
@@ -34,6 +37,7 @@ def prepareFiles(text):
         text = text.replace('\\', '\\\\')
     return text
 
+# Функция первой итерации прочтения конфига:
 def readConfigFirst(file):
     level = 0
     for elementKey in file:
@@ -51,6 +55,7 @@ def readConfigFirst(file):
             except KeyError:
                 print('Key', elementKey, 'from old config does not exist in new config.')
 
+# Функция чтения словаря в конфиге:
 def readConfigDict(fileFragment, path, level):
     for elementKey in fileFragment:
         element = fileFragment[elementKey]
@@ -67,6 +72,7 @@ def readConfigDict(fileFragment, path, level):
             except KeyError:
                 print('Key', elementKey, 'from old config does not exist in new config.')
 
+# Функция чтения списка в конфиге:
 def readConfigList(fileFragment, path, level):
     for elementListIndex in range(len(fileFragment)):
         element = fileFragment[elementListIndex]
@@ -85,11 +91,13 @@ def readConfigList(fileFragment, path, level):
             except KeyError:
                 print('Index', elementListIndex, 'from old config does not exist in new config.')
 
+# Функция удаления части пути при возвращении на предыдущие уровни вложенности:
 def pathLengthCheck(path, level):
     if len(path) >= level:
         del path[level:]
     return path
 
+# Логирующая функция:
 def printTestInfo(path, level, key, fileFragment):
 #     print('Level:', level)
 #     print('Path:', path)
@@ -99,6 +107,7 @@ def printTestInfo(path, level, key, fileFragment):
         print('Set value:', fileFragment)
     print('-------------------------------------------------')
 
+# Функция генерации пути к текущему ключу:
 def jsonPathGenerator(fileName, path, value):
     for pathElement in path:
         if type(pathElement) == int:
@@ -109,6 +118,7 @@ def jsonPathGenerator(fileName, path, value):
     fileName = fileName.replace('\\N', '\\\\N')
     return fileName
 
+# Функция генерации пути к файлу:
 def filePathGenerator(system, service, type):
     if system == 'win':
         if type == 'old':
@@ -122,6 +132,7 @@ def filePathGenerator(system, service, type):
             path = service + '/appsettings.ProdLinux.json'
     return path
 
+# Функция получения версии из файла readme.txt:
 def getVersion(type):
     if type == 'old':
         with open('WebApi-old/Readme.txt', 'r', encoding="utf8") as file:
@@ -135,20 +146,26 @@ def getVersion(type):
     version = version.replace('Версия ', '')
     return version
 
+# Начало основного алгоритма:
 print('Start process')
 print("OS:", system)
 
+# Проверка на наличие директорий WebApi:
 if os.path.isdir('WebApi') and os.path.isdir('WebApi-old'):
     print('Old version:', getVersion('old'), '   New version:', getVersion('new'))
 else:
     print('Is WebApi and WebApi-old folders exists?')
 
+# Для каждой службы из списка:
 for service in services:
     print('*********************')
     print('Working with', service)
     print('*********************')
+
+    # Проверка на наличие папки службы:
     if os.path.isdir(service) and os.path.isdir(service + '-old'):
 
+        # Проверка на изменение конфига RDP2:
         if service == 'RDP2' and versions.index(getVersion('old')) < 3 and versions.index(getVersion('new')) > 2:
             flagRDP = True
             continue
@@ -156,9 +173,11 @@ for service in services:
         print(filePathGenerator(system, service, 'old'))
         print(filePathGenerator(system, service, 'new'))
 
+        # Создание бэкапов:
         shutil.copyfile(filePathGenerator(system, service, 'old'), filePathGenerator(system, service, 'old') + '-backup')
         shutil.copyfile(filePathGenerator(system, service, 'new'), filePathGenerator(system, service, 'new') + '-backup')
 
+        # Чтение и запись конфиг-файлов:
         with io.open((filePathGenerator(system, service, 'old')), 'r', encoding="utf-8", errors='ignore') as file:
             text = file.read()
         text = prepareFiles(text)
@@ -174,8 +193,10 @@ for service in services:
         old = json.load(codecs.open(filePathGenerator(system, service, 'old'), 'r', 'utf-8-sig')) # encoding="utf-8" 'utf-8-sig')
         blank = json.load(codecs.open(filePathGenerator(system, service, 'new'), 'r', 'utf-8-sig'))
 
+        # Вход в первую функцию
         readConfigFirst(old)
 
+        # Формирование json из полученных переменных:
         with open(filePathGenerator(system, service, 'new'), 'w') as file:
             json.dump(blank, file, ensure_ascii=False, indent=4)
     else:
